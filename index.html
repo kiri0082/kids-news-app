@@ -159,7 +159,21 @@
     font-weight: 800;
     box-shadow: 3px 3px 0 var(--ink);
   }
+  /* Without a photo the badges flow in a row above the text instead of overlaying it. */
+  .card.no-image .ribbon, .card.no-image .topic-pill {
+    position: static;
+    border-radius: 999px;
+    box-shadow: 2px 2px 0 var(--ink);
+  }
+  .badges {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 8px; flex-wrap: wrap;
+    padding: 16px 18px 0;
+  }
+  .badges:empty { display: none; }
+  .badges .topic-pill { margin-left: auto; }
   .card-body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 8px; }
+  .card.no-image .card-body { padding-top: 12px; }
   .meta {
     display: flex; flex-wrap: wrap; gap: 6px 10px;
     font-size: 0.75rem; font-weight: 800; color: var(--sub);
@@ -326,7 +340,8 @@ const SOURCES = [
   // TIME for Kids' feed flattens each article into one <p>; the page has the real structure.
   { id: "tfk", name: "TIME for Kids", feed: "https://www.timeforkids.com/feed/", articleSelector: ".article-show__content-article" },
   { id: "sne", name: "Science News Explores", feed: "https://www.snexplores.org/feed" },
-  { id: "nasa", name: "NASA", feed: "https://www.nasa.gov/feed/", skip: /^APOD:/ },
+  // NASA's feed mixes in APOD mirror pages and Spanish-language press releases.
+  { id: "nasa", name: "NASA", feed: "https://www.nasa.gov/feed/", skip: /^APOD:|nota de prensa en inglés|^La NASA\b/i },
 ];
 
 // First match wins; checked against the title first, then the summary.
@@ -522,7 +537,9 @@ let readerToken = 0;
 async function fetchStructuredArticle(item) {
   if (!item.articleSelector) return null;
   if (articleCache.has(item.link)) return articleCache.get(item.link);
-  const res = await fetch(RAW_PROXY + encodeURIComponent(item.link));
+  // The proxy echoes the requesting origin in its CORS header and its CDN caches the response,
+  // so key the cache by our hostname or another origin's cached copy gets rejected here.
+  const res = await fetch(RAW_PROXY + encodeURIComponent(item.link) + "&origin=" + encodeURIComponent(location.hostname));
   if (!res.ok) throw new Error("article fetch failed");
   const doc = new DOMParser().parseFromString(await res.text(), "text/html");
   const node = doc.querySelector(item.articleSelector);
@@ -593,14 +610,14 @@ function renderStories(items) {
     const isRead = readSet.has(item.link);
 
     const card = document.createElement("article");
-    card.className = "card" + (isHero ? " hero" : "") + (isRead ? " read" : "");
+    const img = firstImage(item);
+    card.className = "card" + (isHero ? " hero" : "") + (isRead ? " read" : "") + (img ? "" : " no-image");
     card.style.setProperty("--topic", topic.color);
     card.tabIndex = 0;
     card.setAttribute("role", "button");
     card.dataset.index = index;
     card.dataset.link = item.link;
 
-    const img = firstImage(item);
     let desc = stripHtml(item.description);
     if (desc.toLowerCase().startsWith((item.title || "").toLowerCase())) {
       desc = desc.slice(item.title.length).trim();
@@ -608,10 +625,9 @@ function renderStories(items) {
     const maxLen = isHero ? 240 : 150;
     desc = desc.slice(0, maxLen);
 
+    const badges = `${isHero ? `<span class="ribbon">⭐ TOP STORY</span>` : ""}<span class="topic-pill"></span>`;
     card.innerHTML = `
-      ${img ? `<img src="${img}" alt="" loading="lazy">` : ""}
-      ${isHero ? `<span class="ribbon">⭐ TOP STORY</span>` : ""}
-      <span class="topic-pill"></span>
+      ${img ? `<img src="${img}" alt="" loading="lazy">${badges}` : `<div class="badges">${badges}</div>`}
       <div class="card-body">
         <div class="meta">
           <span class="src"></span>
@@ -643,7 +659,7 @@ async function fetchSource(source) {
   if (data.status !== "ok") throw new Error(source.name + " feed failed");
   return data.items
     .filter(isSafe)
-    .filter(item => !(source.skip && source.skip.test(item.title || "")))
+    .filter(item => !(source.skip && source.skip.test((item.title || "") + "\n" + stripHtml(item.description || "").slice(0, 200))))
     .map(item => ({ ...item, pubDate: parseDate(item.pubDate), sourceId: source.id, sourceName: source.name, articleSelector: source.articleSelector }));
 }
 
