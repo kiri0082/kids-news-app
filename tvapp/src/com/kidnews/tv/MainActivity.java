@@ -27,6 +27,9 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        try {
+            Log.d(TAG, "app v" + getPackageManager().getPackageInfo(getPackageName(), 0).versionName);
+        } catch (Exception ignored) {}
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         WebView.setWebContentsDebuggingEnabled(true);
