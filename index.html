@@ -4,126 +4,193 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kid News</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #eaf6ff;
+    --bg: #fff8ec;
     --card: #ffffff;
-    --ink: #1a2b3c;
-    --sub: #51708a;
-    --accent: #2aa8a0;
-    --accent-dark: #1d7f78;
-    --chip: #d7f2ef;
+    --ink: #1b1740;
+    --sub: #5b5878;
+    --accent: #7c3aed;
+    --sun: #ffd60a;
+    --mint: #c7f9cc;
+    --topic: #475569;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: linear-gradient(180deg, var(--bg), #ffffff 60%);
+    font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-weight: 500;
+    background-color: var(--bg);
+    background-image: radial-gradient(rgba(27, 23, 64, 0.08) 1.2px, transparent 1.2px);
+    background-size: 22px 22px;
     color: var(--ink);
     min-height: 100vh;
   }
+  .display { font-family: "Fredoka", "Nunito", sans-serif; font-weight: 700; }
+
   header {
-    padding: 28px 20px 18px;
+    padding: 30px 20px 10px;
     text-align: center;
   }
   header h1 {
+    font-family: "Fredoka", sans-serif;
+    font-weight: 700;
     margin: 0;
-    font-size: 2.1rem;
-    letter-spacing: -0.02em;
+    font-size: clamp(2.4rem, 7vw, 3.6rem);
+    letter-spacing: 0.01em;
+    line-height: 1;
+    display: inline-block;
+    transform: rotate(-2deg);
+    text-shadow: 4px 4px 0 var(--sun);
   }
-  header h1 span { color: var(--accent-dark); }
+  header h1 span { color: var(--accent); }
   header p {
-    margin: 6px 0 0;
+    margin: 14px 0 0;
     color: var(--sub);
-    font-size: 0.95rem;
+    font-size: 1.05rem;
+    font-weight: 700;
   }
+  .streak {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 12px;
+    background: var(--ink);
+    color: #fff;
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 0.85rem;
+    font-weight: 800;
+  }
+
   .controls {
     display: flex;
-    gap: 8px;
+    gap: 10px;
     justify-content: center;
     flex-wrap: wrap;
-    margin: 16px 0 8px;
+    margin: 18px 0 10px;
     padding: 0 16px;
   }
   .chip {
-    border: none;
-    background: var(--chip);
-    color: var(--accent-dark);
+    font-family: inherit;
+    font-weight: 800;
+    border: 3px solid var(--ink);
+    background: #fff;
+    color: var(--ink);
     padding: 8px 16px;
     border-radius: 999px;
-    font-size: 0.85rem;
-    font-weight: 600;
+    font-size: 0.9rem;
     cursor: pointer;
+    box-shadow: 3px 3px 0 var(--ink);
+    transition: transform 0.12s, box-shadow 0.12s;
   }
-  .chip.active { background: var(--accent); color: white; }
+  .chip:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
+  .chip:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+  .chip.active { background: var(--ink); color: #fff; }
+  .chip.surprise { background: var(--sun); }
   .status {
     text-align: center;
     color: var(--sub);
-    font-size: 0.85rem;
+    font-size: 0.8rem;
+    font-weight: 700;
     min-height: 20px;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
+    padding: 0 16px;
   }
+
   main {
-    max-width: 760px;
+    max-width: 1000px;
     margin: 0 auto;
     padding: 8px 16px 60px;
     display: grid;
-    gap: 16px;
+    gap: 22px;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
   }
   .card {
+    position: relative;
     background: var(--card);
-    border-radius: 18px;
+    border: 3px solid var(--ink);
+    border-radius: 22px;
     overflow: hidden;
-    box-shadow: 0 2px 14px rgba(20, 60, 80, 0.08);
     display: flex;
     flex-direction: column;
-    text-decoration: none;
-    color: inherit;
+    cursor: pointer;
+    box-shadow: 7px 7px 0 var(--topic);
+    transition: transform 0.15s, box-shadow 0.15s;
   }
+  .card:hover { transform: translate(-3px, -3px) rotate(-0.4deg); box-shadow: 11px 11px 0 var(--topic); }
+  .card:active { transform: translate(2px, 2px); box-shadow: 3px 3px 0 var(--topic); }
+  .card:focus-visible { outline: 4px solid var(--sun); outline-offset: 3px; }
+  .card.read { opacity: 0.72; }
   .card img {
     width: 100%;
-    height: 170px;
+    height: 180px;
     object-fit: cover;
-    background: var(--chip);
+    background: var(--mint);
+    border-bottom: 3px solid var(--ink);
   }
-  .card-body { padding: 14px 16px 16px; }
-  .source-tag {
-    display: inline-block;
-    font-size: 0.7rem;
+  .card.hero { grid-column: 1 / -1; }
+  .card.hero img { height: clamp(220px, 40vw, 360px); }
+  .card.hero h2 { font-size: clamp(1.5rem, 3.5vw, 2.1rem); }
+  .card.hero p { font-size: 1.05rem; }
+  .ribbon {
+    position: absolute; top: 14px; left: -4px;
+    background: var(--sun);
+    border: 3px solid var(--ink);
+    border-radius: 0 12px 12px 0;
+    padding: 5px 12px 5px 14px;
+    font-family: "Fredoka", sans-serif;
     font-weight: 700;
-    text-transform: uppercase;
+    font-size: 0.85rem;
     letter-spacing: 0.04em;
-    color: var(--accent-dark);
-    background: var(--chip);
-    padding: 3px 9px;
-    border-radius: 999px;
-    margin-bottom: 8px;
+    box-shadow: 3px 3px 0 var(--ink);
   }
+  .topic-pill {
+    position: absolute; top: 14px; right: 14px;
+    background: var(--topic);
+    color: #fff;
+    border: 3px solid var(--ink);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 0.8rem;
+    font-weight: 800;
+    box-shadow: 3px 3px 0 var(--ink);
+  }
+  .card-body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 8px; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 6px 10px;
+    font-size: 0.75rem; font-weight: 800; color: var(--sub);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .meta .new { color: #b45309; }
+  .meta .done { color: #15803d; }
   .card h2 {
-    margin: 0 0 6px;
-    font-size: 1.1rem;
-    line-height: 1.35;
+    font-family: "Fredoka", sans-serif;
+    font-weight: 600;
+    margin: 0;
+    font-size: 1.3rem;
+    line-height: 1.2;
   }
   .card p {
     margin: 0;
     color: var(--sub);
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     line-height: 1.5;
   }
-  .card .date {
-    margin-top: 10px;
-    font-size: 0.75rem;
-    color: #8aa3b5;
-  }
   .empty, .error {
+    grid-column: 1 / -1;
     text-align: center;
     color: var(--sub);
+    font-weight: 700;
     padding: 40px 20px;
   }
   .spinner {
-    width: 28px; height: 28px;
-    border: 3px solid var(--chip);
-    border-top-color: var(--accent);
+    width: 34px; height: 34px;
+    border: 4px solid var(--ink);
+    border-top-color: var(--sun);
     border-radius: 50%;
     margin: 0 auto 12px;
     animation: spin 0.8s linear infinite;
@@ -131,16 +198,16 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   footer {
     text-align: center;
-    color: #9ab2c2;
-    font-size: 0.75rem;
+    color: var(--sub);
+    font-size: 0.78rem;
+    font-weight: 700;
     padding: 10px 20px 30px;
   }
-  .card { cursor: pointer; }
-  .card:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
   body.reader-open { overflow: hidden; }
   .reader-backdrop {
     position: fixed; inset: 0;
-    background: rgba(10, 30, 45, 0.55);
+    background: rgba(27, 23, 64, 0.6);
     display: flex; align-items: center; justify-content: center;
     padding: 16px;
     z-index: 10;
@@ -149,11 +216,12 @@
   .reader {
     position: relative;
     background: var(--card);
-    border-radius: 22px;
-    width: min(760px, 100%);
+    border: 3px solid var(--ink);
+    border-radius: 26px;
+    width: min(780px, 100%);
     max-height: calc(100vh - 32px);
     display: flex;
-    box-shadow: 0 12px 40px rgba(10, 30, 45, 0.3);
+    box-shadow: 10px 10px 0 var(--topic);
   }
   .reader-scroll {
     overflow-y: auto;
@@ -162,52 +230,67 @@
   }
   .reader-close {
     position: absolute; top: 12px; right: 12px;
-    width: 40px; height: 40px;
-    border: none; border-radius: 50%;
-    background: var(--chip); color: var(--accent-dark);
-    font-size: 1.1rem; font-weight: 700;
+    width: 44px; height: 44px;
+    border: 3px solid var(--ink); border-radius: 50%;
+    background: var(--sun); color: var(--ink);
+    font-size: 1.2rem; font-weight: 800;
     cursor: pointer; z-index: 1;
+    box-shadow: 3px 3px 0 var(--ink);
   }
+  .reader .topic-pill { position: static; display: inline-block; margin-right: 8px; }
+  .reader .source-tag { font-size: 0.78rem; font-weight: 800; color: var(--sub); text-transform: uppercase; letter-spacing: 0.04em; }
   .reader h1 {
-    margin: 6px 40px 4px 0;
-    font-size: 1.5rem;
-    line-height: 1.3;
+    font-family: "Fredoka", sans-serif;
+    font-weight: 700;
+    margin: 12px 44px 6px 0;
+    font-size: clamp(1.6rem, 4vw, 2.2rem);
+    line-height: 1.15;
   }
+  .reader .meta { margin-bottom: 4px; }
   .reader-body {
     margin-top: 18px;
-    font-size: 1.05rem;
-    line-height: 1.65;
+    font-size: 1.1rem;
+    line-height: 1.7;
   }
   .reader-body p { margin: 0 0 1em; }
   .reader-body h2, .reader-body h3, .reader-body h4 {
+    font-family: "Fredoka", sans-serif;
+    font-weight: 600;
     margin: 1.4em 0 0.5em;
-    font-size: 1.15rem;
-    color: var(--accent-dark);
+    font-size: 1.35rem;
+    color: var(--topic);
   }
   .reader-body img {
     max-width: 100%; height: auto;
-    border-radius: 14px;
+    border: 3px solid var(--ink);
+    border-radius: 18px;
     display: block;
     margin: 0 auto;
   }
   .reader-body figure { margin: 1.2em 0; }
   .reader-body figcaption {
-    font-size: 0.8rem; color: var(--sub);
-    text-align: center; margin-top: 6px;
+    font-size: 0.82rem; color: var(--sub); font-weight: 700;
+    text-align: center; margin-top: 8px;
   }
   .reader-body blockquote {
     margin: 1em 0; padding: 8px 16px;
-    border-left: 4px solid var(--chip);
+    border-left: 5px solid var(--topic);
     color: var(--sub);
   }
-  .reader-done { display: block; margin: 28px auto 0; }
+  .reader-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 30px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card, .chip { transition: none; }
+    .card:hover { transform: none; }
+  }
 </style>
 </head>
 <body>
 
 <header>
   <h1>📰 Kid <span>News</span></h1>
-  <p>Safe, friendly stories from TIME for Kids, Science News Explores &amp; NASA</p>
+  <p>Fresh, real stories picked for curious minds 🚀</p>
+  <div class="streak" id="streak" hidden></div>
 </header>
 
 <div class="controls" id="filters"></div>
@@ -217,14 +300,18 @@
 <footer>Stories come straight from kid-focused newsrooms and open right here — nothing in this app links out to other websites.</footer>
 
 <div class="reader-backdrop" id="reader" hidden>
-  <div class="reader" role="dialog" aria-modal="true" aria-labelledby="reader-title">
+  <div class="reader" id="reader-panel" role="dialog" aria-modal="true" aria-labelledby="reader-title">
     <button class="reader-close" id="reader-close" aria-label="Close story">✕</button>
     <div class="reader-scroll">
+      <span class="topic-pill" id="reader-topic"></span>
       <span class="source-tag" id="reader-source"></span>
       <h1 id="reader-title"></h1>
-      <div class="date" id="reader-date"></div>
+      <div class="meta" id="reader-meta"></div>
       <div class="reader-body" id="reader-body"></div>
-      <button class="chip reader-done" id="reader-done">Back to stories</button>
+      <div class="reader-actions">
+        <button class="chip" id="reader-done">← Back to stories</button>
+        <button class="chip surprise" id="reader-next">🎲 Another one!</button>
+      </div>
     </div>
   </div>
 </div>
@@ -241,6 +328,24 @@ const SOURCES = [
   { id: "sne", name: "Science News Explores", feed: "https://www.snexplores.org/feed" },
   { id: "nasa", name: "NASA", feed: "https://www.nasa.gov/feed/", skip: /^APOD:/ },
 ];
+
+// First match wins; checked against the title first, then the summary.
+const TOPICS = [
+  { emoji: "🚀", label: "Space",        color: "#7c3aed", re: /\b(space|nasa|astronauts?|moon|mars|planets?|rockets?|orbit|galaxy|telescopes?|satellites?|solar|artemis|comets?|meteors?|stars?|iss|spacex|crew)\b/i },
+  { emoji: "🐾", label: "Animals",      color: "#16a34a", re: /\b(animals?|dogs?|cats?|birds?|fish|whales?|sharks?|bears?|rats?|mole-rats?|insects?|bees?|frogs?|dinosaurs?|wildlife|species|zoo|pets?|elephants?|lions?|penguins?|turtles?|octopus|manatees?|pelicans?)\b/i },
+  { emoji: "⚽", label: "Sports",       color: "#ea580c", re: /\b(sports?|soccer|football|nfl|nba|mlb|baseball|basketball|hockey|olympics?|athletes?|teams?|champions?|championship|league|tennis|golf|racing|swimmers?|world cup|super bowl)\b/i },
+  { emoji: "🌍", label: "Planet Earth", color: "#2563eb", re: /\b(climate|weather|oceans?|rivers?|floods?|flooding|hurricanes?|volcano(es)?|earthquakes?|forests?|earth|environment|rain|storms?|glaciers?|ice|wildfires?|recycling)\b/i },
+  { emoji: "🤖", label: "Tech",         color: "#db2777", re: /\b(robots?|ai|computers?|video games?|gaming|apps?|internet|tech|technology|drones?|electric|inventions?|3d|coding|phones?)\b/i },
+  { emoji: "🧠", label: "Body & Brain", color: "#0891b2", re: /\b(brains?|body|health|sleep|food|eating|burps?|farts?|germs?|virus|doctors?|medicine|smell|taste|senses?|memory)\b/i },
+  { emoji: "🎨", label: "Arts & Fun",   color: "#ca8a04", re: /\b(movies?|music|art|books?|authors?|films?|games?|pok[eé]mon|festivals?|museums?|history|dance|songs?|lego|comics?|road trip|route 66)\b/i },
+];
+const DEFAULT_TOPIC = { emoji: "📰", label: "News", color: "#475569" };
+
+function topicFor(item) {
+  const title = item.title || "";
+  const desc = stripHtml(item.description || "").slice(0, 400);
+  return TOPICS.find(t => t.re.test(title)) || TOPICS.find(t => t.re.test(desc)) || DEFAULT_TOPIC;
+}
 
 // Extra safety net: drop any item whose title/description hints at adult/violent/scary content,
 // in case a feed ever includes something off-brand for a kids audience.
@@ -267,6 +372,11 @@ function firstImage(item) {
   return match ? match[1] : null;
 }
 
+function readMinutes(item) {
+  const words = stripHtml(item.content || item.description || "").split(/\s+/).length;
+  return Math.max(1, Math.round(words / 180));
+}
+
 // rss2json emits "YYYY-MM-DD HH:MM:SS" in UTC with no zone marker.
 function parseDate(d) {
   if (!d) return new Date(NaN);
@@ -282,7 +392,7 @@ function isFresh(item) {
   return !isNaN(age) && age <= MAX_AGE_DAYS;
 }
 
-// TIME for Kids republishes one story per grade level; BBC repeats some items.
+// TIME for Kids republishes one story per grade level.
 function dedupe(items) {
   const seen = new Set();
   return items.filter(item => {
@@ -307,13 +417,39 @@ function formatDate(d) {
   } catch { return ""; }
 }
 
+// Read history is a per-device convenience only.
+const READ_KEY = "kidnews.read";
+function loadRead() {
+  try { return new Set(JSON.parse(localStorage.getItem(READ_KEY) || "[]")); } catch { return new Set(); }
+}
+const readSet = loadRead();
+function markRead(item) {
+  readSet.add(item.link);
+  try { localStorage.setItem(READ_KEY, JSON.stringify([...readSet].slice(-300))); } catch {}
+  const card = document.querySelector(`.card[data-link="${CSS.escape(item.link)}"]`);
+  if (card && !card.classList.contains("read")) {
+    card.classList.add("read");
+    const done = document.createElement("span");
+    done.className = "done";
+    done.textContent = "✓ Read";
+    card.querySelector(".meta").appendChild(done);
+  }
+  updateStreak();
+}
+function updateStreak() {
+  const el = document.getElementById("streak");
+  const n = readSet.size;
+  el.hidden = n === 0;
+  el.textContent = n === 1 ? "📚 1 story read — nice start!" : `📚 ${n} stories read${n >= 10 ? " — you're on fire! 🔥" : ""}`;
+}
+
 function renderFilters(active) {
   const el = document.getElementById("filters");
   el.innerHTML = "";
   const all = document.createElement("button");
   all.className = "chip" + (active === "all" ? " active" : "");
   all.textContent = "All stories";
-  all.onclick = () => loadAll(active === "all" ? null : "all");
+  all.onclick = () => loadAll("all");
   el.appendChild(all);
 
   SOURCES.forEach(s => {
@@ -323,6 +459,20 @@ function renderFilters(active) {
     btn.onclick = () => loadAll(s.id);
     el.appendChild(btn);
   });
+
+  const surprise = document.createElement("button");
+  surprise.className = "chip surprise";
+  surprise.textContent = "🎲 Surprise me!";
+  surprise.onclick = openRandom;
+  el.appendChild(surprise);
+}
+
+function openRandom(exclude) {
+  const pool = currentItems.filter(i => i !== exclude);
+  if (!pool.length) return;
+  const unread = pool.filter(i => !readSet.has(i.link));
+  const pick = (unread.length ? unread : pool)[Math.floor(Math.random() * (unread.length ? unread : pool).length)];
+  openReader(pick);
 }
 
 // Everything a kid sees is rebuilt from a whitelist. Links are unwrapped to
@@ -365,6 +515,7 @@ function articleHtml(item) {
 }
 
 let currentItems = [];
+let currentItem = null;
 const articleCache = new Map();
 let readerToken = 0;
 
@@ -395,20 +546,25 @@ function renderReaderBody(item, html) {
 
 function openReader(item) {
   const token = ++readerToken;
+  currentItem = item;
+  const topic = topicFor(item);
   renderReaderBody(item, articleHtml(item));
   fetchStructuredArticle(item)
     .then(html => { if (html && token === readerToken) renderReaderBody(item, html); })
     .catch(() => {});
 
+  document.getElementById("reader-panel").style.setProperty("--topic", topic.color);
+  document.getElementById("reader-topic").textContent = `${topic.emoji} ${topic.label}`;
   document.getElementById("reader-source").textContent = item.sourceName;
   document.getElementById("reader-title").textContent = item.title;
-  document.getElementById("reader-date").textContent = `${formatDate(item.pubDate)} · ${describeAge(item.pubDate)}`;
+  document.getElementById("reader-meta").textContent = `${formatDate(item.pubDate)} · ${describeAge(item.pubDate)} · ${readMinutes(item)} min read`;
 
   const reader = document.getElementById("reader");
   reader.hidden = false;
   reader.querySelector(".reader-scroll").scrollTop = 0;
   document.body.classList.add("reader-open");
   document.getElementById("reader-close").focus();
+  markRead(item);
 }
 
 function closeReader() {
@@ -418,6 +574,7 @@ function closeReader() {
 
 document.getElementById("reader-close").onclick = closeReader;
 document.getElementById("reader-done").onclick = closeReader;
+document.getElementById("reader-next").onclick = () => openRandom(currentItem);
 document.getElementById("reader").addEventListener("click", e => { if (e.target.id === "reader") closeReader(); });
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeReader(); });
 
@@ -430,31 +587,47 @@ function renderStories(items) {
     return;
   }
   items.forEach((item, index) => {
+    const topic = topicFor(item);
+    const isHero = index === 0 && items.length > 2;
+    const isNew = describeAge(item.pubDate) === "today";
+    const isRead = readSet.has(item.link);
+
     const card = document.createElement("article");
-    card.className = "card";
+    card.className = "card" + (isHero ? " hero" : "") + (isRead ? " read" : "");
+    card.style.setProperty("--topic", topic.color);
     card.tabIndex = 0;
     card.setAttribute("role", "button");
     card.dataset.index = index;
+    card.dataset.link = item.link;
 
     const img = firstImage(item);
     let desc = stripHtml(item.description);
     if (desc.toLowerCase().startsWith((item.title || "").toLowerCase())) {
       desc = desc.slice(item.title.length).trim();
     }
-    desc = desc.slice(0, 160);
+    const maxLen = isHero ? 240 : 150;
+    desc = desc.slice(0, maxLen);
 
     card.innerHTML = `
       ${img ? `<img src="${img}" alt="" loading="lazy">` : ""}
+      ${isHero ? `<span class="ribbon">⭐ TOP STORY</span>` : ""}
+      <span class="topic-pill"></span>
       <div class="card-body">
-        <span class="source-tag"></span>
+        <div class="meta">
+          <span class="src"></span>
+          <span>${formatDate(item.pubDate)} · ${describeAge(item.pubDate)}</span>
+          <span>${readMinutes(item)} min read</span>
+          ${isNew ? `<span class="new">✨ New</span>` : ""}
+          ${isRead ? `<span class="done">✓ Read</span>` : ""}
+        </div>
         <h2></h2>
         <p></p>
-        <div class="date">${formatDate(item.pubDate)} · ${describeAge(item.pubDate)}</div>
       </div>
     `;
-    card.querySelector(".source-tag").textContent = item.sourceName;
+    card.querySelector(".topic-pill").textContent = `${topic.emoji} ${topic.label}`;
+    card.querySelector(".src").textContent = item.sourceName;
     card.querySelector("h2").textContent = item.title;
-    card.querySelector("p").textContent = desc + (desc.length === 160 ? "…" : "");
+    card.querySelector("p").textContent = desc + (desc.length === maxLen ? "…" : "");
     const open = () => openReader(currentItems[card.dataset.index]);
     card.onclick = open;
     card.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
@@ -518,6 +691,7 @@ async function loadAll(filter) {
   }
 }
 
+updateStreak();
 renderFilters(currentFilter);
 loadAll(currentFilter);
 </script>
