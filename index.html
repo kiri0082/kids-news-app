@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kid News</title>
+<style>
+  :root {
+    --bg: #eaf6ff;
+    --card: #ffffff;
+    --ink: #1a2b3c;
+    --sub: #51708a;
+    --accent: #2aa8a0;
+    --accent-dark: #1d7f78;
+    --chip: #d7f2ef;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(180deg, var(--bg), #ffffff 60%);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+  header {
+    padding: 28px 20px 18px;
+    text-align: center;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 2.1rem;
+    letter-spacing: -0.02em;
+  }
+  header h1 span { color: var(--accent-dark); }
+  header p {
+    margin: 6px 0 0;
+    color: var(--sub);
+    font-size: 0.95rem;
+  }
+  .controls {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 16px 0 8px;
+    padding: 0 16px;
+  }
+  .chip {
+    border: none;
+    background: var(--chip);
+    color: var(--accent-dark);
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .chip.active { background: var(--accent); color: white; }
+  .status {
+    text-align: center;
+    color: var(--sub);
+    font-size: 0.85rem;
+    min-height: 20px;
+    margin-bottom: 8px;
+  }
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 8px 16px 60px;
+    display: grid;
+    gap: 16px;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 2px 14px rgba(20, 60, 80, 0.08);
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+    color: inherit;
+  }
+  .card img {
+    width: 100%;
+    height: 170px;
+    object-fit: cover;
+    background: var(--chip);
+  }
+  .card-body { padding: 14px 16px 16px; }
+  .source-tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--accent-dark);
+    background: var(--chip);
+    padding: 3px 9px;
+    border-radius: 999px;
+    margin-bottom: 8px;
+  }
+  .card h2 {
+    margin: 0 0 6px;
+    font-size: 1.1rem;
+    line-height: 1.35;
+  }
+  .card p {
+    margin: 0;
+    color: var(--sub);
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+  .card .date {
+    margin-top: 10px;
+    font-size: 0.75rem;
+    color: #8aa3b5;
+  }
+  .empty, .error {
+    text-align: center;
+    color: var(--sub);
+    padding: 40px 20px;
+  }
+  .spinner {
+    width: 28px; height: 28px;
+    border: 3px solid var(--chip);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    margin: 0 auto 12px;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  footer {
+    text-align: center;
+    color: #9ab2c2;
+    font-size: 0.75rem;
+    padding: 10px 20px 30px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📰 Kid <span>News</span></h1>
+  <p>Safe, friendly stories from News for Kids, TIME for Kids, Science News Explores &amp; NASA</p>
+</header>
+
+<div class="controls" id="filters"></div>
+<div class="status" id="status"></div>
+<main id="main"></main>
+
+<footer>Stories come straight from kid-focused newsrooms. Tap a story to read the full article on their site.</footer>
+
+<script>
+const PROXY = "https://api.rss2json.com/v1/api.json?rss_url=";
+const MAX_AGE_DAYS = 7;
+const STALE_SOURCE_DAYS = 2;
+
+const SOURCES = [
+  { id: "nfk", name: "News for Kids", feed: "https://newsforkids.net/feed/" },
+  { id: "tfk", name: "TIME for Kids", feed: "https://www.timeforkids.com/feed/" },
+  { id: "sne", name: "Science News Explores", feed: "https://www.snexplores.org/feed" },
+  { id: "nasa", name: "NASA", feed: "https://www.nasa.gov/feed/" },
+];
+
+// Extra safety net: drop any item whose title/description hints at adult/violent/scary content,
+// in case a feed ever includes something off-brand for a kids audience.
+const BLOCK_WORDS = [
+  "murder","shooting","stabbing","rape","sexual","suicide","terroris","bomb",
+  "war crime","explicit","nude","drug overdose","massacre"
+];
+
+function isSafe(item) {
+  const text = ((item.title || "") + " " + (item.description || "")).toLowerCase();
+  return !BLOCK_WORDS.some(w => text.includes(w));
+}
+
+function stripHtml(html) {
+  const div = document.createElement("div");
+  div.innerHTML = html || "";
+  return (div.textContent || div.innerText || "").trim();
+}
+
+function firstImage(item) {
+  if (item.thumbnail) return item.thumbnail;
+  if (item.enclosure && item.enclosure.link) return item.enclosure.link;
+  const match = /<img[^>]+src="([^"]+)"/.exec(item.description || item.content || "");
+  return match ? match[1] : null;
+}
+
+// rss2json emits "YYYY-MM-DD HH:MM:SS" in UTC with no zone marker.
+function parseDate(d) {
+  if (!d) return new Date(NaN);
+  return /[TZ]/.test(d) ? new Date(d) : new Date(d.replace(" ", "T") + "Z");
+}
+
+function ageDays(d) {
+  return (Date.now() - new Date(d).getTime()) / 86400000;
+}
+
+function isFresh(item) {
+  const age = ageDays(item.pubDate);
+  return !isNaN(age) && age <= MAX_AGE_DAYS;
+}
+
+// TIME for Kids republishes one story per grade level; BBC repeats some items.
+function dedupe(items) {
+  const seen = new Set();
+  return items.filter(item => {
+    const key = (item.title || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function describeAge(d) {
+  const dayOf = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((dayOf(new Date()) - dayOf(new Date(d))) / 86400000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  return `${days} days ago`;
+}
+
+function formatDate(d) {
+  try {
+    return new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  } catch { return ""; }
+}
+
+function renderFilters(active) {
+  const el = document.getElementById("filters");
+  el.innerHTML = "";
+  const all = document.createElement("button");
+  all.className = "chip" + (active === "all" ? " active" : "");
+  all.textContent = "All stories";
+  all.onclick = () => loadAll(active === "all" ? null : "all");
+  el.appendChild(all);
+
+  SOURCES.forEach(s => {
+    const btn = document.createElement("button");
+    btn.className = "chip" + (active === s.id ? " active" : "");
+    btn.textContent = s.name;
+    btn.onclick = () => loadAll(s.id);
+    el.appendChild(btn);
+  });
+}
+
+function renderStories(items) {
+  const main = document.getElementById("main");
+  main.innerHTML = "";
+  if (!items.length) {
+    main.innerHTML = '<div class="empty">No stories to show right now. Try again in a bit!</div>';
+    return;
+  }
+  items.forEach(item => {
+    const a = document.createElement("a");
+    a.className = "card";
+    a.href = item.link;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+
+    const img = firstImage(item);
+    let desc = stripHtml(item.description);
+    if (desc.toLowerCase().startsWith((item.title || "").toLowerCase())) {
+      desc = desc.slice(item.title.length).trim();
+    }
+    desc = desc.slice(0, 160);
+
+    a.innerHTML = `
+      ${img ? `<img src="${img}" alt="" loading="lazy">` : ""}
+      <div class="card-body">
+        <span class="source-tag">${item.sourceName}</span>
+        <h2>${item.title}</h2>
+        <p>${desc}${desc.length === 160 ? "…" : ""}</p>
+        <div class="date">${formatDate(item.pubDate)} · ${describeAge(item.pubDate)}</div>
+      </div>
+    `;
+    main.appendChild(a);
+  });
+}
+
+let currentFilter = "all";
+
+async function fetchSource(source) {
+  const res = await fetch(PROXY + encodeURIComponent(source.feed));
+  const data = await res.json();
+  if (data.status !== "ok") throw new Error(source.name + " feed failed");
+  return data.items
+    .filter(isSafe)
+    .map(item => ({ ...item, pubDate: parseDate(item.pubDate), sourceId: source.id, sourceName: source.name }));
+}
+
+async function loadAll(filter) {
+  currentFilter = filter || currentFilter;
+  renderFilters(currentFilter);
+
+  const status = document.getElementById("status");
+  const main = document.getElementById("main");
+  status.textContent = "Loading stories…";
+  main.innerHTML = '<div class="empty"><div class="spinner"></div>Fetching the news…</div>';
+
+  const toFetch = currentFilter === "all" ? SOURCES : SOURCES.filter(s => s.id === currentFilter);
+
+  try {
+    const results = await Promise.allSettled(toFetch.map(fetchSource));
+    let items = [];
+    let failures = [];
+    let staleSources = [];
+    results.forEach((r, i) => {
+      if (r.status !== "fulfilled") { failures.push(toFetch[i].name); return; }
+      const fresh = r.value.filter(isFresh);
+      const newest = fresh.reduce((m, it) => Math.max(m, new Date(it.pubDate).getTime()), 0);
+      if (!fresh.length || ageDays(newest) > STALE_SOURCE_DAYS) {
+        staleSources.push(`${toFetch[i].name} (latest ${newest ? describeAge(newest) : "older than a week"})`);
+      }
+      items = items.concat(fresh);
+    });
+
+    items.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+    items = dedupe(items);
+
+    renderStories(items);
+    const notes = [];
+    if (failures.length) notes.push(`Couldn't load: ${failures.join(", ")}.`);
+    if (staleSources.length) notes.push(`May be outdated: ${staleSources.join(", ")}.`);
+    status.textContent = notes.length
+      ? notes.join(" ")
+      : `${items.length} stories from the last ${MAX_AGE_DAYS} days · updated ${new Date().toLocaleTimeString()}`;
+  } catch (e) {
+    main.innerHTML = `<div class="error">Something went wrong loading the news. Please try again.</div>`;
+    status.textContent = "";
+  }
+}
+
+renderFilters(currentFilter);
+loadAll(currentFilter);
+</script>
+
+</body>
+</html>
