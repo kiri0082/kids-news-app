@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kid News</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -53,6 +53,7 @@
     font-size: 1.05rem;
     font-weight: 700;
   }
+  .streak[hidden] { display: none; }
   .streak {
     display: inline-flex;
     align-items: center;
@@ -219,21 +220,26 @@
   }
 
   body.reader-open { overflow: hidden; }
+  /* iOS Safari's 100vh ignores its toolbars, so size with dvh and let the
+     panel's auto margins center it only when it actually fits. */
   .reader-backdrop {
     position: fixed; inset: 0;
     background: rgba(27, 23, 64, 0.6);
-    display: flex; align-items: center; justify-content: center;
-    padding: 16px;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+             max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
     z-index: 10;
   }
   .reader-backdrop[hidden] { display: none; }
   .reader {
     position: relative;
+    margin: auto 0;
     background: var(--card);
     border: 3px solid var(--ink);
     border-radius: 26px;
     width: min(780px, 100%);
-    max-height: calc(100vh - 32px);
+    max-height: calc(100vh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     display: flex;
     box-shadow: 10px 10px 0 var(--topic);
   }
@@ -293,6 +299,22 @@
   }
   .reader-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 30px; }
 
+  /* TV mode (?tv=1): 10-foot sizing, D-pad focus ring, no hover effects. */
+  html.tv { font-size: 21px; }
+  html.tv body { background-size: 30px 30px; }
+  html.tv header { padding: 22px 20px 6px; }
+  html.tv main { max-width: 1760px; grid-template-columns: repeat(3, 1fr); gap: 28px; padding: 10px 40px 60px; }
+  html.tv .card img { height: 240px; }
+  html.tv .card.hero img { height: 380px; }
+  html.tv .card:hover { transform: none; box-shadow: 7px 7px 0 var(--topic); }
+  html.tv .card:focus { outline: 6px solid var(--sun); outline-offset: 4px; transform: translate(-3px, -3px); box-shadow: 11px 11px 0 var(--topic); }
+  html.tv .chip:focus { outline: 5px solid var(--sun); outline-offset: 3px; }
+  html.tv .reader { width: min(1200px, 100%); }
+  html.tv .reader-scroll { padding: 36px 44px 40px; }
+  html.tv .reader-body { font-size: 1.25rem; line-height: 1.75; }
+  html.tv .reader-actions .chip:focus, html.tv .reader-close:focus { outline: 5px solid var(--accent); outline-offset: 3px; }
+  html.tv footer { display: none; }
+
   @media (prefers-reduced-motion: reduce) {
     .card, .chip { transition: none; }
     .card:hover { transform: none; }
@@ -331,6 +353,9 @@
 </div>
 
 <script>
+const IS_TV = new URLSearchParams(location.search).get("tv") === "1";
+if (IS_TV) document.documentElement.classList.add("tv");
+
 const PROXY = "https://api.rss2json.com/v1/api.json?rss_url=";
 const RAW_PROXY = "https://api.allorigins.win/raw?url=";
 const MAX_AGE_DAYS = 7;
@@ -552,6 +577,13 @@ function renderReaderBody(item, html) {
   const body = document.getElementById("reader-body");
   body.innerHTML = "";
   const content = sanitize(html);
+  // Some pages (NASA) open with a "5 Min Read" label and repeat the headline.
+  const title = (item.title || "").trim().toLowerCase();
+  while (content.firstElementChild) {
+    const text = content.firstElementChild.textContent.trim().toLowerCase();
+    if (!/^\d+\s*min(ute)?s?\s*read$/.test(text) && text !== title) break;
+    content.firstElementChild.remove();
+  }
   const hero = firstImage(item);
   if (hero && !content.querySelector("img")) {
     const img = document.createElement("img");
@@ -561,9 +593,12 @@ function renderReaderBody(item, html) {
   body.appendChild(content);
 }
 
+let lastFocused = null;
+
 function openReader(item) {
   const token = ++readerToken;
   currentItem = item;
+  lastFocused = document.activeElement && document.activeElement.closest(".card, .chip");
   const topic = topicFor(item);
   renderReaderBody(item, articleHtml(item));
   fetchStructuredArticle(item)
@@ -587,6 +622,11 @@ function openReader(item) {
 function closeReader() {
   document.getElementById("reader").hidden = true;
   document.body.classList.remove("reader-open");
+  if (lastFocused && lastFocused.isConnected) lastFocused.focus();
+}
+
+function readerOpen() {
+  return !document.getElementById("reader").hidden;
 }
 
 document.getElementById("reader-close").onclick = closeReader;
@@ -649,6 +689,10 @@ function renderStories(items) {
     card.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
     main.appendChild(card);
   });
+  if (IS_TV && !readerOpen()) {
+    const first = main.querySelector(".card");
+    if (first) first.focus();
+  }
 }
 
 let currentFilter = "all";
@@ -706,6 +750,70 @@ async function loadAll(filter) {
     status.textContent = "";
   }
 }
+
+// D-pad / keyboard navigation. On the grid the arrows move the highlight
+// geometrically (nearest card in that direction); inside a story they scroll.
+function focusables() {
+  return [...document.querySelectorAll(".chip, .card")].filter(el => el.offsetParent !== null && !el.closest("#reader"));
+}
+
+function moveFocus(dir) {
+  const els = focusables();
+  const cur = els.includes(document.activeElement) ? document.activeElement : null;
+  if (!cur) { if (els[0]) els[0].focus(); return; }
+  const r = cur.getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  let best = null, bestScore = Infinity;
+  els.forEach(el => {
+    if (el === cur) return;
+    const s = el.getBoundingClientRect();
+    const dx = (s.left + s.width / 2) - cx, dy = (s.top + s.height / 2) - cy;
+    let primary, secondary;
+    if (dir === "ArrowUp" || dir === "ArrowDown") {
+      if (dir === "ArrowUp" ? s.bottom > r.top + 1 : s.top < r.bottom - 1) return;
+      primary = Math.abs(dy); secondary = Math.abs(dx);
+    } else {
+      if (dir === "ArrowLeft" ? s.right > r.left + 1 : s.left < r.right - 1) return;
+      primary = Math.abs(dx); secondary = Math.abs(dy);
+    }
+    const score = primary + secondary * 2.5;
+    if (score < bestScore) { bestScore = score; best = el; }
+  });
+  if (best) {
+    best.focus();
+    best.scrollIntoView({ block: "center", behavior: IS_TV ? "auto" : "smooth" });
+  }
+}
+
+document.addEventListener("keydown", e => {
+  const arrows = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
+  if (!arrows.includes(e.key)) return;
+  e.preventDefault();
+  if (!readerOpen()) { moveFocus(e.key); return; }
+
+  const scroller = document.querySelector(".reader-scroll");
+  const buttons = [...document.querySelectorAll(".reader-actions .chip")];
+  if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+    const i = buttons.indexOf(document.activeElement);
+    const next = buttons[(i + (e.key === "ArrowRight" ? 1 : buttons.length - 1) + buttons.length) % buttons.length];
+    next.focus();
+    next.scrollIntoView({ block: "nearest" });
+    return;
+  }
+  const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4;
+  if (e.key === "ArrowDown" && atBottom && !buttons.includes(document.activeElement)) { buttons[0].focus(); return; }
+  if (e.key === "ArrowUp" && buttons.includes(document.activeElement)) document.getElementById("reader-close").focus();
+  scroller.scrollBy({ top: e.key === "ArrowDown" ? 260 : -260, behavior: "smooth" });
+});
+
+// Hook for the TV app's Back button: returns true when the page consumed it.
+window.kidnews = {
+  back() { if (readerOpen()) { closeReader(); return true; } return false; }
+};
+
+// A TV leaves the page open for hours; refresh while nobody is mid-story.
+const REFRESH_MS = 30 * 60 * 1000;
+setInterval(() => { if (!readerOpen()) loadAll(currentFilter); }, REFRESH_MS);
 
 updateStreak();
 renderFilters(currentFilter);
