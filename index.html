@@ -135,31 +135,111 @@
     font-size: 0.75rem;
     padding: 10px 20px 30px;
   }
+  .card { cursor: pointer; }
+  .card:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  body.reader-open { overflow: hidden; }
+  .reader-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(10, 30, 45, 0.55);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+    z-index: 10;
+  }
+  .reader-backdrop[hidden] { display: none; }
+  .reader {
+    position: relative;
+    background: var(--card);
+    border-radius: 22px;
+    width: min(760px, 100%);
+    max-height: calc(100vh - 32px);
+    display: flex;
+    box-shadow: 0 12px 40px rgba(10, 30, 45, 0.3);
+  }
+  .reader-scroll {
+    overflow-y: auto;
+    padding: 28px 28px 32px;
+    width: 100%;
+  }
+  .reader-close {
+    position: absolute; top: 12px; right: 12px;
+    width: 40px; height: 40px;
+    border: none; border-radius: 50%;
+    background: var(--chip); color: var(--accent-dark);
+    font-size: 1.1rem; font-weight: 700;
+    cursor: pointer; z-index: 1;
+  }
+  .reader h1 {
+    margin: 6px 40px 4px 0;
+    font-size: 1.5rem;
+    line-height: 1.3;
+  }
+  .reader-body {
+    margin-top: 18px;
+    font-size: 1.05rem;
+    line-height: 1.65;
+  }
+  .reader-body p { margin: 0 0 1em; }
+  .reader-body h2, .reader-body h3, .reader-body h4 {
+    margin: 1.4em 0 0.5em;
+    font-size: 1.15rem;
+    color: var(--accent-dark);
+  }
+  .reader-body img {
+    max-width: 100%; height: auto;
+    border-radius: 14px;
+    display: block;
+    margin: 0 auto;
+  }
+  .reader-body figure { margin: 1.2em 0; }
+  .reader-body figcaption {
+    font-size: 0.8rem; color: var(--sub);
+    text-align: center; margin-top: 6px;
+  }
+  .reader-body blockquote {
+    margin: 1em 0; padding: 8px 16px;
+    border-left: 4px solid var(--chip);
+    color: var(--sub);
+  }
+  .reader-done { display: block; margin: 28px auto 0; }
 </style>
 </head>
 <body>
 
 <header>
   <h1>📰 Kid <span>News</span></h1>
-  <p>Safe, friendly stories from News for Kids, TIME for Kids, Science News Explores &amp; NASA</p>
+  <p>Safe, friendly stories from TIME for Kids, Science News Explores &amp; NASA</p>
 </header>
 
 <div class="controls" id="filters"></div>
 <div class="status" id="status"></div>
 <main id="main"></main>
 
-<footer>Stories come straight from kid-focused newsrooms. Tap a story to read the full article on their site.</footer>
+<footer>Stories come straight from kid-focused newsrooms and open right here — nothing in this app links out to other websites.</footer>
+
+<div class="reader-backdrop" id="reader" hidden>
+  <div class="reader" role="dialog" aria-modal="true" aria-labelledby="reader-title">
+    <button class="reader-close" id="reader-close" aria-label="Close story">✕</button>
+    <div class="reader-scroll">
+      <span class="source-tag" id="reader-source"></span>
+      <h1 id="reader-title"></h1>
+      <div class="date" id="reader-date"></div>
+      <div class="reader-body" id="reader-body"></div>
+      <button class="chip reader-done" id="reader-done">Back to stories</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const PROXY = "https://api.rss2json.com/v1/api.json?rss_url=";
+const RAW_PROXY = "https://api.allorigins.win/raw?url=";
 const MAX_AGE_DAYS = 7;
 const STALE_SOURCE_DAYS = 2;
 
 const SOURCES = [
-  { id: "nfk", name: "News for Kids", feed: "https://newsforkids.net/feed/" },
-  { id: "tfk", name: "TIME for Kids", feed: "https://www.timeforkids.com/feed/" },
+  // TIME for Kids' feed flattens each article into one <p>; the page has the real structure.
+  { id: "tfk", name: "TIME for Kids", feed: "https://www.timeforkids.com/feed/", articleSelector: ".article-show__content-article" },
   { id: "sne", name: "Science News Explores", feed: "https://www.snexplores.org/feed" },
-  { id: "nasa", name: "NASA", feed: "https://www.nasa.gov/feed/" },
+  { id: "nasa", name: "NASA", feed: "https://www.nasa.gov/feed/", skip: /^APOD:/ },
 ];
 
 // Extra safety net: drop any item whose title/description hints at adult/violent/scary content,
@@ -245,19 +325,116 @@ function renderFilters(active) {
   });
 }
 
+// Everything a kid sees is rebuilt from a whitelist. Links are unwrapped to
+// plain text so there is no way to navigate off the page.
+const ALLOWED_TAGS = new Set(["P","BR","H2","H3","H4","UL","OL","LI","STRONG","B","EM","I","BLOCKQUOTE","FIGURE","FIGCAPTION","IMG"]);
+const DROP_SELECTOR = "script,style,iframe,svg,nav,aside,form,button,input,[class*='navigation'],[class*='related'],[class*='share'],[class*='social'],[class*='embed'],[class*='instagram'],[class*='tiktok'],[class*='twitter'],[class*='youtube']";
+
+function sanitize(html) {
+  const doc = new DOMParser().parseFromString(html || "", "text/html");
+  doc.querySelectorAll(DROP_SELECTOR).forEach(el => el.remove());
+  const out = document.createDocumentFragment();
+  const walk = (src, dst) => {
+    src.childNodes.forEach(n => {
+      if (n.nodeType === Node.TEXT_NODE) { dst.appendChild(document.createTextNode(n.textContent)); return; }
+      if (n.nodeType !== Node.ELEMENT_NODE) return;
+      if (!ALLOWED_TAGS.has(n.tagName)) { walk(n, dst); return; }
+      const el = document.createElement(n.tagName.toLowerCase());
+      if (n.tagName === "IMG") {
+        const src = n.getAttribute("src") || "";
+        if (!/^https:\/\//i.test(src)) return;
+        el.src = src;
+        el.alt = n.getAttribute("alt") || "";
+        el.loading = "lazy";
+      }
+      walk(n, el);
+      if (el.tagName === "P" && !el.textContent.trim() && !el.querySelector("img")) return;
+      dst.appendChild(el);
+    });
+  };
+  walk(doc.body, out);
+  return out;
+}
+
+function articleHtml(item) {
+  let html = item.content || item.description || "";
+  const title = (item.title || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // TIME for Kids repeats the headline as the first line of the body.
+  html = html.replace(new RegExp("^\\s*<p>\\s*" + title + "\\s*(<br\\s*/?>)?", "i"), "<p>");
+  return html;
+}
+
+let currentItems = [];
+const articleCache = new Map();
+let readerToken = 0;
+
+async function fetchStructuredArticle(item) {
+  if (!item.articleSelector) return null;
+  if (articleCache.has(item.link)) return articleCache.get(item.link);
+  const res = await fetch(RAW_PROXY + encodeURIComponent(item.link));
+  if (!res.ok) throw new Error("article fetch failed");
+  const doc = new DOMParser().parseFromString(await res.text(), "text/html");
+  const node = doc.querySelector(item.articleSelector);
+  const html = node && node.querySelectorAll("p").length > 1 ? node.innerHTML : null;
+  articleCache.set(item.link, html);
+  return html;
+}
+
+function renderReaderBody(item, html) {
+  const body = document.getElementById("reader-body");
+  body.innerHTML = "";
+  const content = sanitize(html);
+  const hero = firstImage(item);
+  if (hero && !content.querySelector("img")) {
+    const img = document.createElement("img");
+    img.src = hero; img.alt = "";
+    body.appendChild(img);
+  }
+  body.appendChild(content);
+}
+
+function openReader(item) {
+  const token = ++readerToken;
+  renderReaderBody(item, articleHtml(item));
+  fetchStructuredArticle(item)
+    .then(html => { if (html && token === readerToken) renderReaderBody(item, html); })
+    .catch(() => {});
+
+  document.getElementById("reader-source").textContent = item.sourceName;
+  document.getElementById("reader-title").textContent = item.title;
+  document.getElementById("reader-date").textContent = `${formatDate(item.pubDate)} · ${describeAge(item.pubDate)}`;
+
+  const reader = document.getElementById("reader");
+  reader.hidden = false;
+  reader.querySelector(".reader-scroll").scrollTop = 0;
+  document.body.classList.add("reader-open");
+  document.getElementById("reader-close").focus();
+}
+
+function closeReader() {
+  document.getElementById("reader").hidden = true;
+  document.body.classList.remove("reader-open");
+}
+
+document.getElementById("reader-close").onclick = closeReader;
+document.getElementById("reader-done").onclick = closeReader;
+document.getElementById("reader").addEventListener("click", e => { if (e.target.id === "reader") closeReader(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeReader(); });
+
 function renderStories(items) {
+  currentItems = items;
   const main = document.getElementById("main");
   main.innerHTML = "";
   if (!items.length) {
     main.innerHTML = '<div class="empty">No stories to show right now. Try again in a bit!</div>';
     return;
   }
-  items.forEach(item => {
-    const a = document.createElement("a");
-    a.className = "card";
-    a.href = item.link;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
+  items.forEach((item, index) => {
+    const card = document.createElement("article");
+    card.className = "card";
+    card.tabIndex = 0;
+    card.setAttribute("role", "button");
+    card.dataset.index = index;
 
     const img = firstImage(item);
     let desc = stripHtml(item.description);
@@ -266,16 +443,22 @@ function renderStories(items) {
     }
     desc = desc.slice(0, 160);
 
-    a.innerHTML = `
+    card.innerHTML = `
       ${img ? `<img src="${img}" alt="" loading="lazy">` : ""}
       <div class="card-body">
-        <span class="source-tag">${item.sourceName}</span>
-        <h2>${item.title}</h2>
-        <p>${desc}${desc.length === 160 ? "…" : ""}</p>
+        <span class="source-tag"></span>
+        <h2></h2>
+        <p></p>
         <div class="date">${formatDate(item.pubDate)} · ${describeAge(item.pubDate)}</div>
       </div>
     `;
-    main.appendChild(a);
+    card.querySelector(".source-tag").textContent = item.sourceName;
+    card.querySelector("h2").textContent = item.title;
+    card.querySelector("p").textContent = desc + (desc.length === 160 ? "…" : "");
+    const open = () => openReader(currentItems[card.dataset.index]);
+    card.onclick = open;
+    card.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
+    main.appendChild(card);
   });
 }
 
@@ -287,7 +470,8 @@ async function fetchSource(source) {
   if (data.status !== "ok") throw new Error(source.name + " feed failed");
   return data.items
     .filter(isSafe)
-    .map(item => ({ ...item, pubDate: parseDate(item.pubDate), sourceId: source.id, sourceName: source.name }));
+    .filter(item => !(source.skip && source.skip.test(item.title || "")))
+    .map(item => ({ ...item, pubDate: parseDate(item.pubDate), sourceId: source.id, sourceName: source.name, articleSelector: source.articleSelector }));
 }
 
 async function loadAll(filter) {
@@ -316,8 +500,10 @@ async function loadAll(filter) {
       items = items.concat(fresh);
     });
 
-    items.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+    // Keep the longest variant of each story (TIME for Kids' higher-grade editions carry the full text).
+    items.sort((a, b) => (b.content || "").length - (a.content || "").length);
     items = dedupe(items);
+    items.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
 
     renderStories(items);
     const notes = [];
